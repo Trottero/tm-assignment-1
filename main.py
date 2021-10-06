@@ -23,7 +23,8 @@ os.makedirs('results', exist_ok=True)
 os.makedirs('models',  exist_ok=True)
 
 # Load in training dataset
-twenty_train = fetch_20newsgroups(subset='train', shuffle=True, random_state=42)
+twenty_train = fetch_20newsgroups(
+    subset='train', shuffle=True, random_state=42)
 
 print('Number of classes: ', len(twenty_train.target_names))
 print('Number of samples: ', len(twenty_train.data))
@@ -75,7 +76,6 @@ features = {
     'tf': TfidfVectorizer(use_idf=False),
     'tf-idf': TfidfVectorizer()
 }
-
 # %%
 
 # Fit classifiers for every configuration
@@ -104,13 +104,44 @@ for classifiername, classifier in classifiers.items():
         pipeline = unpickle_pipeline(classifiername + featurename)
         predicted = pipeline.predict(docs_test)
         # print out accuracy
-        print(f'{classifiername}{featurename}', np.mean(predicted == twenty_test.target))
-        report = metrics.classification_report(twenty_test.target, predicted, target_names=twenty_test.target_names, output_dict=True)
+        print(f'{classifiername}{featurename}',
+              np.mean(predicted == twenty_test.target))
+        report = metrics.classification_report(
+            twenty_test.target, predicted, target_names=twenty_test.target_names, output_dict=True)
         # This filters out the accuracy line which only has a single value
-        report = {name: value.values() for name, value in report.items() if name != 'accuracy'}
+        report = {name: value.values()
+                  for name, value in report.items() if name != 'accuracy'}
         # Convert to dataframe for easy csv transformation
-        df = pd.DataFrame.from_dict(report, orient='index', columns=['precision', 'recall', 'f1-score', 'support'])
+        df = pd.DataFrame.from_dict(report, orient='index', columns=[
+                                    'precision', 'recall', 'f1-score', 'support'])
         with open(f'results/{classifiername}{featurename}.csv', 'w', newline='') as f:
             f.writelines(df.to_csv())
+
+# %%
+# merge all csv files into 1 file with latex table formatting
+
+# iterate over all results files
+result_dir = "results"
+col_names = ["", "precision", "recall", "f1-score"]
+themes = twenty_train.target_names
+
+with open("all_results_latex_table_format.txt", "w") as complete_result_f:
+    complete_result_f.write("\\hline \n")
+    complete_result_f.write("&".join(col_names)+"\\\ \\hline \n")
+    for filename in os.listdir(result_dir):
+        # check to be sure we read the right files
+        if filename.endswith(".csv"):
+            with open(os.path.join(result_dir, filename), "r") as subresult_f:
+                # only take results of precision, recall, f1 of macro avg
+                # and round each num to 3 digits, and enclose within $$ so it will
+                # be displayed nicely in table
+                macro_avg_formatted = [f"${str(round(float(num), 3))}$" for num in subresult_f.readlines()[-2].strip().split(
+                    ",")[1:-1]]
+                complete_result_f.write(
+                    "&".join([filename[:-4]]+macro_avg_formatted)+"\\\ \\hline \n")
+
+
+# %%
+# try out different countvectorizer features. for which one ?
 
 # %%

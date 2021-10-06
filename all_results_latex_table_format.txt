@@ -1,0 +1,11 @@
+\hline 
+&precision&recall&f1-score\\ \hline 
+svntf-idf&$0.828$&$0.813$&$0.812$\\ \hline 
+randomforesttf-idf&$0.452$&$0.436$&$0.394$\\ \hline 
+randomforesttf&$0.461$&$0.438$&$0.39$\\ \hline 
+nbayestf-idf&$0.826$&$0.757$&$0.756$\\ \hline 
+svncount&$0.755$&$0.746$&$0.745$\\ \hline 
+randomforestcount&$0.476$&$0.425$&$0.384$\\ \hline 
+svntf&$0.779$&$0.758$&$0.755$\\ \hline 
+nbayescount&$0.762$&$0.764$&$0.745$\\ \hline 
+nbayestf&$0.792$&$0.682$&$0.673$\\ \hline 
