@@ -1,6 +1,8 @@
 # categories = ['alt.atheism', 'soc.religion.christian', 'comp.graphics', 'sci.med']
 # %%
+from sklearn.model_selection import GridSearchCV
 from sklearn import metrics
+from sklearn import naive_bayes
 from sklearn.pipeline import Pipeline
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.datasets import fetch_20newsgroups
@@ -143,5 +145,26 @@ with open("all_results_latex_table_format.txt", "w") as complete_result_f:
 
 # %%
 # try out different countvectorizer features. for which one ?
+# for unigrams: less features than texts in corpus
+
+parameters = {
+    'vectorizer__lowercase': (True, False),
+    'vectorizer__stop_words': ('english', None),
+    'vectorizer__analyzer': ('word', 'char', 'char_wb'),
+    'vectorizer__ngram_range': [(1, 1), (1, 2)],
+    'vectorizer__max_features': (10, 20, 50, 100, 500, 1000, , 1500, None)
+}
+
+text_clf = Pipeline(
+    [('vectorizer', TfidfVectorizer()), ('clf', MultinomialNB())])
+
+gs_clf = GridSearchCV(text_clf, parameters, cv=5, n_jobs=-1)
+gs_clf = gs_clf.fit(twenty_train.data[:400], twenty_train.target[:400])
+
+
+# %%
+for param_name in sorted(parameters.keys()):
+    print("%s: %r" % (param_name, gs_clf.best_params_[param_name]))
+
 
 # %%
