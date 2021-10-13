@@ -1,0 +1,1 @@
+{"vectorizer__analyzer": "word", "vectorizer__lowercase": true, "vectorizer__max_features": null, "vectorizer__ngram_range": [1, 2], "vectorizer__stop_words": null}

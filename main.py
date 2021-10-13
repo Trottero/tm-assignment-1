@@ -16,6 +16,7 @@ import pickle
 import os
 import csv
 import pandas as pd
+import json
 
 
 # %%
@@ -44,7 +45,7 @@ print(twenty_train.target_names[twenty_train.target[0]])
 # Model related functions
 def get_pipeline(classifier, feature):
     text_clf = Pipeline([
-        ('vect', feature),
+        ('vectorizer', feature),
         ('clf', classifier),
     ])
 
@@ -70,7 +71,7 @@ classifiers = {
     'svn': SGDClassifier(loss='hinge', penalty='l2',
                          alpha=1e-3, random_state=42,
                          max_iter=5, tol=None),
-    'randomforest': RandomForestClassifier(max_depth=2, random_state=0)
+    'randomforest': RandomForestClassifier(random_state=0)
 }
 
 features = {
@@ -80,12 +81,21 @@ features = {
 }
 # %%
 
+parameters = {
+    'vectorizer__lowercase': (True, False),
+    'vectorizer__stop_words': ('english', None),
+    'vectorizer__analyzer': ('word', 'char', 'char_wb'),
+    'vectorizer__ngram_range': [(1, 1), (1, 2)],
+    'vectorizer__max_features': (500, 1000, 1500, 3000, None)
+}
+
 # Fit classifiers for every configuration
 print('Training models')
 pbar = tqdm(total=len(classifiers) * len(features))
 for classifiername, classifier in classifiers.items():
     for featurename, feature in features.items():
         pipeline = get_pipeline(classifier, feature)
+        pipeline = GridSearchCV(pipeline, parameters, cv=5, n_jobs=-1)
 
         pipeline.fit(twenty_train.data, twenty_train.target)
         pickle_pipeline(pipeline, classifiername + featurename)
@@ -100,24 +110,31 @@ pbar.close()
 twenty_test = fetch_20newsgroups(subset='test', shuffle=True, random_state=42)
 docs_test = twenty_test.data
 
-# Would probably be prettier if we were to just walk the models folder and use those values instead
-for classifiername, classifier in classifiers.items():
-    for featurename, feature in features.items():
-        pipeline = unpickle_pipeline(classifiername + featurename)
-        predicted = pipeline.predict(docs_test)
-        # print out accuracy
-        print(f'{classifiername}{featurename}',
-              np.mean(predicted == twenty_test.target))
-        report = metrics.classification_report(
-            twenty_test.target, predicted, target_names=twenty_test.target_names, output_dict=True)
-        # This filters out the accuracy line which only has a single value
-        report = {name: value.values()
-                  for name, value in report.items() if name != 'accuracy'}
-        # Convert to dataframe for easy csv transformation
-        df = pd.DataFrame.from_dict(report, orient='index', columns=[
-                                    'precision', 'recall', 'f1-score', 'support'])
-        with open(f'results/{classifiername}{featurename}.csv', 'w', newline='') as f:
-            f.writelines(df.to_csv())
+
+def report_and_save(modelname, pipeline, twenty_test, predicted):
+    print(f'{modelname}', np.mean(predicted == twenty_test.target))
+    report = metrics.classification_report(
+        twenty_test.target, predicted, target_names=twenty_test.target_names, output_dict=True)
+    # This filters out the accuracy line which only has a single value
+    report = {name: value.values()
+              for name, value in report.items() if name != 'accuracy'}
+    # Convert to dataframe for easy csv transformation
+    df = pd.DataFrame.from_dict(report, orient='index', columns=[
+        'precision', 'recall', 'f1-score', 'support'])
+
+    with open(f'results/{modelname}.csv', 'w', newline='') as f:
+        f.writelines(df.to_csv())
+
+    with open(f'results/{modelname}-params.txt', 'w', newline='') as f:
+        f.write(json.dumps(pipeline.best_params_))
+
+
+        # Use the pickled models to predict.
+for modelpickle in os.listdir('models'):
+    modelname = modelpickle.split('.')[0:-1][0]
+    pipeline = unpickle_pipeline(modelname)
+    predicted = pipeline.predict(docs_test)
+    report_and_save(modelname, pipeline, twenty_test, predicted)
 
 # %%
 # merge all csv files into 1 file with latex table formatting
@@ -141,30 +158,5 @@ with open("all_results_latex_table_format.txt", "w") as complete_result_f:
                     ",")[1:-1]]
                 complete_result_f.write(
                     "&".join([filename[:-4]]+macro_avg_formatted)+"\\\ \\hline \n")
-
-
-# %%
-# try out different countvectorizer features. for which one ?
-# for unigrams: less features than texts in corpus
-
-parameters = {
-    'vectorizer__lowercase': (True, False),
-    'vectorizer__stop_words': ('english', None),
-    'vectorizer__analyzer': ('word', 'char', 'char_wb'),
-    'vectorizer__ngram_range': [(1, 1), (1, 2)],
-    'vectorizer__max_features': (10, 20, 50, 100, 500, 1000, , 1500, None)
-}
-
-text_clf = Pipeline(
-    [('vectorizer', TfidfVectorizer()), ('clf', MultinomialNB())])
-
-gs_clf = GridSearchCV(text_clf, parameters, cv=5, n_jobs=-1)
-gs_clf = gs_clf.fit(twenty_train.data[:400], twenty_train.target[:400])
-
-
-# %%
-for param_name in sorted(parameters.keys()):
-    print("%s: %r" % (param_name, gs_clf.best_params_[param_name]))
-
 
 # %%
