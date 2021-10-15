@@ -1,4 +1,3 @@
-# categories = ['alt.atheism', 'soc.religion.christian', 'comp.graphics', 'sci.med']
 # %%
 from sklearn.model_selection import GridSearchCV
 from sklearn import metrics
@@ -22,8 +21,16 @@ import json
 # %%
 
 # Create dirs to organise results / models
-os.makedirs('results', exist_ok=True)
-os.makedirs('models',  exist_ok=True)
+os.makedirs('configs/gridsearch/models', exist_ok=True)
+os.makedirs('configs/gridsearch/results', exist_ok=True)
+os.makedirs('configs/default/models', exist_ok=True)
+os.makedirs('configs/default/results', exist_ok=True)
+
+gridsearch = False
+
+run_dir = 'configs/default'
+if gridsearch:
+    run_dir = 'configs/gridsearch'
 
 # Load in training dataset
 twenty_train = fetch_20newsgroups(
@@ -53,12 +60,12 @@ def get_pipeline(classifier, feature):
 
 
 def pickle_pipeline(pipeline, name):
-    with open(f'models/{name}.pickle', 'wb') as f:
+    with open(f'{name}.pickle', 'wb') as f:
         pickle.dump(pipeline, f, protocol=pickle.HIGHEST_PROTOCOL)
 
 
 def unpickle_pipeline(name):
-    with open(f'models/{name}.pickle', 'rb') as f:
+    with open(f'{name}.pickle', 'rb') as f:
         return pickle.load(f)
 
 
@@ -95,10 +102,12 @@ pbar = tqdm(total=len(classifiers) * len(features))
 for classifiername, classifier in classifiers.items():
     for featurename, feature in features.items():
         pipeline = get_pipeline(classifier, feature)
-        pipeline = GridSearchCV(pipeline, parameters, cv=5, n_jobs=-1)
+
+        if gridsearch:
+            pipeline = GridSearchCV(pipeline, parameters, cv=5, n_jobs=-1)
 
         pipeline.fit(twenty_train.data, twenty_train.target)
-        pickle_pipeline(pipeline, classifiername + featurename)
+        pickle_pipeline(pipeline, f'{run_dir}/models/{classifiername}{featurename}')
         pbar.update()
 
 pbar.close()
@@ -122,17 +131,19 @@ def report_and_save(modelname, pipeline, twenty_test, predicted):
     df = pd.DataFrame.from_dict(report, orient='index', columns=[
         'precision', 'recall', 'f1-score', 'support'])
 
-    with open(f'results/{modelname}.csv', 'w', newline='') as f:
+    with open(f'{run_dir}/results/{modelname}.csv', 'w', newline='') as f:
         f.writelines(df.to_csv())
 
-    with open(f'results/{modelname}-params.txt', 'w', newline='') as f:
-        f.write(json.dumps(pipeline.best_params_))
+    # only store best params when gs was done.
+    if gridsearch:
+        with open(f'{run_dir}/{modelname}-params.txt', 'w', newline='') as f:
+            f.write(json.dumps(pipeline.best_params_))
 
 
-        # Use the pickled models to predict.
-for modelpickle in os.listdir('models'):
+# Use the pickled models to predict.
+for modelpickle in os.listdir(f'{run_dir}/models'):
     modelname = modelpickle.split('.')[0:-1][0]
-    pipeline = unpickle_pipeline(modelname)
+    pipeline = unpickle_pipeline(f'{run_dir}/models/{modelname}')
     predicted = pipeline.predict(docs_test)
     report_and_save(modelname, pipeline, twenty_test, predicted)
 
@@ -140,23 +151,23 @@ for modelpickle in os.listdir('models'):
 # merge all csv files into 1 file with latex table formatting
 
 # iterate over all results files
-result_dir = "results"
-col_names = ["", "precision", "recall", "f1-score"]
-themes = twenty_train.target_names
+# result_dir = f"{run_dir}/results"
+# col_names = ["", "precision", "recall", "f1-score"]
+# themes = twenty_train.target_names
 
-with open("all_results_latex_table_format.txt", "w") as complete_result_f:
-    complete_result_f.write("\\hline \n")
-    complete_result_f.write("&".join(col_names)+"\\\ \\hline \n")
-    for filename in os.listdir(result_dir):
-        # check to be sure we read the right files
-        if filename.endswith(".csv"):
-            with open(os.path.join(result_dir, filename), "r") as subresult_f:
-                # only take results of precision, recall, f1 of macro avg
-                # and round each num to 3 digits, and enclose within $$ so it will
-                # be displayed nicely in table
-                macro_avg_formatted = [f"${str(round(float(num), 3))}$" for num in subresult_f.readlines()[-2].strip().split(
-                    ",")[1:-1]]
-                complete_result_f.write(
-                    "&".join([filename[:-4]]+macro_avg_formatted)+"\\\ \\hline \n")
+# with open(f'{run_dir}/all_results_latex_table_format.txt', 'w') as complete_result_f:
+#     complete_result_f.write("\\hline \n")
+#     complete_result_f.write("&".join(col_names)+"\\\ \\hline \n")
+#     for filename in os.listdir(result_dir):
+#         # check to be sure we read the right files
+#         if filename.endswith(".csv"):
+#             with open(os.path.join(result_dir, filename), "r") as subresult_f:
+#                 # only take results of precision, recall, f1 of macro avg
+#                 # and round each num to 3 digits, and enclose within $$ so it will
+#                 # be displayed nicely in table
+#                 macro_avg_formatted = [f"${str(round(float(num), 3))}$" for num in subresult_f.readlines()[-2].strip().split(
+#                     ",")[1:-1]]
+#                 complete_result_f.write(
+#                     "&".join([filename[:-4]]+macro_avg_formatted)+"\\\ \\hline \n")
 
 # %%
