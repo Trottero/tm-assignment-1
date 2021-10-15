@@ -16,7 +16,7 @@ import os
 import csv
 import pandas as pd
 import json
-
+import argparse
 
 # %%
 
@@ -26,7 +26,12 @@ os.makedirs('configs/gridsearch/results', exist_ok=True)
 os.makedirs('configs/default/models', exist_ok=True)
 os.makedirs('configs/default/results', exist_ok=True)
 
-gridsearch = False
+parser = argparse.ArgumentParser()
+parser.add_argument('--gridsearch', type=bool, default=False)
+
+args = parser.parse_args()
+
+gridsearch = args.gridsearch
 
 run_dir = 'configs/default'
 if gridsearch:
